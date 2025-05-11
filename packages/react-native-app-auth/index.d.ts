@@ -6,7 +6,11 @@ export interface ServiceConfiguration {
   endSessionEndpoint?: string;
 }
 
-export type BaseConfiguration =
+export type BaseConfiguration = {
+  sslPins?: {
+    [domain: string]: string[];
+  };
+} & (
   | {
       issuer?: string;
       serviceConfiguration: ServiceConfiguration;
@@ -14,7 +18,8 @@ export type BaseConfiguration =
   | {
       issuer: string;
       serviceConfiguration?: ServiceConfiguration;
-    };
+    }
+);
 
 type CustomHeaders = {
   authorize?: Record<string, string>;

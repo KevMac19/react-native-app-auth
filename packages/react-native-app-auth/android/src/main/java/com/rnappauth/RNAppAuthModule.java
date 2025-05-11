@@ -65,6 +65,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
+import com.facebook.react.bridge.ReadableMapKeySetIterator;
+import java.util.HashSet;
+import java.util.Set;
+
 public class RNAppAuthModule extends ReactContextBaseJavaModule implements ActivityEventListener {
 
     public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome";
@@ -85,6 +89,9 @@ public class RNAppAuthModule extends ReactContextBaseJavaModule implements Activ
     private final ConcurrentHashMap<String, AuthorizationServiceConfiguration> mServiceConfigurations = new ConcurrentHashMap<>();
     private boolean isPrefetched = false;
 
+    private Map<String, Set<String>> sslPins = new ConcurrentHashMap<>();
+
+
     public RNAppAuthModule(ReactApplicationContext reactContext) {
         super(reactContext);
         this.reactContext = reactContext;
@@ -102,14 +109,19 @@ public class RNAppAuthModule extends ReactContextBaseJavaModule implements Activ
             final boolean dangerouslyAllowInsecureHttpRequests,
             final ReadableMap customHeaders,
             final Double connectionTimeoutMillis,
+            final ReadableMap sslPins,  // New parameter
             final Promise promise) {
         if (warmAndPrefetchChrome) {
             warmChromeCustomTab(reactContext, issuer);
         }
 
         this.parseHeaderMap(customHeaders);
-        final ConnectionBuilder builder = createConnectionBuilder(dangerouslyAllowInsecureHttpRequests,
-                this.authorizationRequestHeaders, connectionTimeoutMillis);
+        final ConnectionBuilder builder = createConnectionBuilder(
+            dangerouslyAllowInsecureHttpRequests,
+            this.authorizationRequestHeaders, 
+            connectionTimeoutMillis,
+            sslPins  // Pass SSL pins
+        );
         final CountDownLatch fetchConfigurationLatch = new CountDownLatch(1);
 
         if (!isPrefetched) {
@@ -166,10 +178,15 @@ public class RNAppAuthModule extends ReactContextBaseJavaModule implements Activ
             final Double connectionTimeoutMillis,
             final boolean dangerouslyAllowInsecureHttpRequests,
             final ReadableMap customHeaders,
+            final ReadableMap sslPins,  // Add new parameter
             final Promise promise) {
         this.parseHeaderMap(customHeaders);
-        final ConnectionBuilder builder = createConnectionBuilder(dangerouslyAllowInsecureHttpRequests,
-                this.registrationRequestHeaders, connectionTimeoutMillis);
+        final ConnectionBuilder builder = createConnectionBuilder(
+            dangerouslyAllowInsecureHttpRequests,
+            this.registrationRequestHeaders,
+            connectionTimeoutMillis,
+            sslPins  // Pass SSL pins
+        );
         final AppAuthConfiguration appAuthConfiguration = this.createAppAuthConfiguration(builder,
                 dangerouslyAllowInsecureHttpRequests, null);
         final HashMap<String, String> additionalParametersMap = MapUtil.readableMapToHashMap(additionalParameters);
@@ -243,10 +260,15 @@ public class RNAppAuthModule extends ReactContextBaseJavaModule implements Activ
             final ReadableMap customHeaders,
             final ReadableArray androidAllowCustomBrowsers,
             final boolean androidTrustedWebActivity,
+            final ReadableMap sslPins,  // Add new parameter
             final Promise promise) {
         this.parseHeaderMap(customHeaders);
-        final ConnectionBuilder builder = createConnectionBuilder(dangerouslyAllowInsecureHttpRequests,
-                this.authorizationRequestHeaders, connectionTimeoutMillis);
+        final ConnectionBuilder builder = createConnectionBuilder(
+            dangerouslyAllowInsecureHttpRequests,
+            this.authorizationRequestHeaders,
+            connectionTimeoutMillis,
+            sslPins  // Pass SSL pins
+        );
         final AppAuthConfiguration appAuthConfiguration = this.createAppAuthConfiguration(builder,
                 dangerouslyAllowInsecureHttpRequests, androidAllowCustomBrowsers);
         final HashMap<String, String> additionalParametersMap = MapUtil.readableMapToHashMap(additionalParameters);
@@ -336,10 +358,15 @@ public class RNAppAuthModule extends ReactContextBaseJavaModule implements Activ
             final boolean dangerouslyAllowInsecureHttpRequests,
             final ReadableMap customHeaders,
             final ReadableArray androidAllowCustomBrowsers,
+            final ReadableMap sslPins,  // Add new parameter
             final Promise promise) {
         this.parseHeaderMap(customHeaders);
-        final ConnectionBuilder builder = createConnectionBuilder(dangerouslyAllowInsecureHttpRequests,
-                this.tokenRequestHeaders, connectionTimeoutMillis);
+        final ConnectionBuilder builder = createConnectionBuilder(
+            dangerouslyAllowInsecureHttpRequests,
+            this.tokenRequestHeaders,
+            connectionTimeoutMillis,
+            sslPins  // Pass SSL pins
+        );
         final AppAuthConfiguration appAuthConfiguration = createAppAuthConfiguration(builder,
                 dangerouslyAllowInsecureHttpRequests, androidAllowCustomBrowsers);
         final HashMap<String, String> additionalParametersMap = MapUtil.readableMapToHashMap(additionalParameters);
@@ -424,7 +451,12 @@ public class RNAppAuthModule extends ReactContextBaseJavaModule implements Activ
             final boolean dangerouslyAllowInsecureHttpRequests,
             final ReadableArray androidAllowCustomBrowsers,
             final Promise promise) {
-        final ConnectionBuilder builder = createConnectionBuilder(dangerouslyAllowInsecureHttpRequests, null);
+        final ConnectionBuilder builder = createConnectionBuilder(
+            dangerouslyAllowInsecureHttpRequests,
+            null,
+            null,  // connectionTimeoutMillis
+            null   // sslPins
+        );
         final AppAuthConfiguration appAuthConfiguration = this.createAppAuthConfiguration(builder,
                 dangerouslyAllowInsecureHttpRequests, androidAllowCustomBrowsers);
         final HashMap<String, String> additionalParametersMap = MapUtil.readableMapToHashMap(additionalParameters);
@@ -520,9 +552,14 @@ public class RNAppAuthModule extends ReactContextBaseJavaModule implements Activ
 
             final Promise authorizePromise = this.promise;
             final AppAuthConfiguration configuration = createAppAuthConfiguration(
-                    createConnectionBuilder(this.dangerouslyAllowInsecureHttpRequests, this.tokenRequestHeaders),
+                createConnectionBuilder(
                     this.dangerouslyAllowInsecureHttpRequests,
-                    null
+                    this.tokenRequestHeaders,
+                    null, // connectionTimeoutMillis
+                    null  // sslPinsConfig
+                ),
+                this.dangerouslyAllowInsecureHttpRequests,
+                null
             );
 
             AuthorizationService authService = new AuthorizationService(this.reactContext, configuration);
@@ -926,43 +963,48 @@ public class RNAppAuthModule extends ReactContextBaseJavaModule implements Activ
     /*
      * Create appropriate connection builder based on provided settings
      */
-    private ConnectionBuilder createConnectionBuilder(boolean allowInsecureConnections, Map<String, String> headers,
-            Double connectionTimeoutMillis) {
-        ConnectionBuilder proxiedBuilder;
+    private ConnectionBuilder createConnectionBuilder(
+        boolean allowInsecureConnections,
+        Map<String, String> headers,
+        Double connectionTimeoutMillis,
+        ReadableMap sslPinsConfig
+    ) {
 
-        if (allowInsecureConnections) {
-            proxiedBuilder = UnsafeConnectionBuilder.INSTANCE;
-        } else {
-            proxiedBuilder = DefaultConnectionBuilder.INSTANCE;
-        }
+        ConnectionBuilder proxiedBuilder = allowInsecureConnections ? 
+            UnsafeConnectionBuilder.INSTANCE : 
+            DefaultConnectionBuilder.INSTANCE;
 
-        CustomConnectionBuilder customConnection = new CustomConnectionBuilder(proxiedBuilder);
+        CustomConnectionBuilder customConnection = new CustomConnectionBuilder(
+            proxiedBuilder,
+            parseSslPins(sslPinsConfig)
+        );
 
         if (headers != null) {
             customConnection.setHeaders(headers);
         }
 
-        customConnection.setConnectionTimeout(connectionTimeoutMillis.intValue());
+        if (connectionTimeoutMillis != null) {
+            customConnection.setConnectionTimeout(connectionTimeoutMillis.intValue());
+        }
 
         return customConnection;
     }
 
-    private ConnectionBuilder createConnectionBuilder(boolean allowInsecureConnections, Map<String, String> headers) {
-        ConnectionBuilder proxiedBuilder;
-
-        if (allowInsecureConnections) {
-            proxiedBuilder = UnsafeConnectionBuilder.INSTANCE;
-        } else {
-            proxiedBuilder = DefaultConnectionBuilder.INSTANCE;
+    private Map<String, Set<String>> parseSslPins(ReadableMap sslPinsConfig) {
+        Map<String, Set<String>> parsed = new ConcurrentHashMap<>();
+        if (sslPinsConfig != null) {
+            ReadableMapKeySetIterator iterator = sslPinsConfig.keySetIterator();
+            while (iterator.hasNextKey()) {
+                String domain = iterator.nextKey();
+                ReadableArray pinsArray = sslPinsConfig.getArray(domain);
+                Set<String> pins = new HashSet<>();
+                for (int i = 0; i < pinsArray.size(); i++) {
+                    pins.add(pinsArray.getString(i));
+                }
+                parsed.put(domain, pins);
+            }
         }
-
-        CustomConnectionBuilder customConnection = new CustomConnectionBuilder(proxiedBuilder);
-
-        if (headers != null) {
-            customConnection.setHeaders(headers);
-        }
-
-        return customConnection;
+        return parsed;
     }
 
     /*

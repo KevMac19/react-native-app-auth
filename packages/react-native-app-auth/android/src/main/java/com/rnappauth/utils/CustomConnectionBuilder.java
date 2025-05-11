@@ -16,6 +16,7 @@ package com.rnappauth.utils;
 
 
 import android.net.Uri;
+import android.util.Log;
 import androidx.annotation.NonNull;
 
 import net.openid.appauth.connectivity.ConnectionBuilder;
@@ -25,6 +26,11 @@ import java.net.HttpURLConnection;
 import java.util.concurrent.TimeUnit;
 import java.util.Map;
 
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import java.security.SecureRandom;
+import java.util.Set; // Add this import
 
 /**
  * An implementation of {@link ConnectionBuilder} that permits
@@ -38,9 +44,12 @@ public final class CustomConnectionBuilder implements ConnectionBuilder {
     private int connectionTimeoutMs = (int) TimeUnit.SECONDS.toMillis(15);
     private int readTimeoutMs = (int) TimeUnit.SECONDS.toMillis(10);     
     private ConnectionBuilder connectionBuilder;
+    private final Map<String, Set<String>> sslPins;
 
-    public CustomConnectionBuilder(ConnectionBuilder connectionBuilderToUse) {
-        connectionBuilder = connectionBuilderToUse;
+    public CustomConnectionBuilder(ConnectionBuilder connectionBuilderToUse, 
+                                 Map<String, Set<String>> sslPins) {
+        this.connectionBuilder = connectionBuilderToUse;
+        this.sslPins = sslPins;
     }
 
     public void setHeaders (Map<String, String> headersToSet) {
@@ -66,6 +75,23 @@ public final class CustomConnectionBuilder implements ConnectionBuilder {
         conn.setConnectTimeout(connectionTimeoutMs);
         conn.setReadTimeout(readTimeoutMs);
 
+        if (conn instanceof HttpsURLConnection && sslPins != null && !sslPins.isEmpty()) {
+            HttpsURLConnection httpsConn = (HttpsURLConnection) conn;
+            configureSSLPinning(httpsConn);
+        }
         return conn;
+    }
+
+    private void configureSSLPinning(HttpsURLConnection connection) {
+        try {
+            Log.d("SSL_DEBUG", "Initializing SSL context with pins: " + sslPins.toString());
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, new TrustManager[] {new SSLPinner(sslPins)}, new SecureRandom());
+            connection.setSSLSocketFactory(sslContext.getSocketFactory());
+            Log.d("SSL_DEBUG", "SSL context configured successfully");
+        } catch (Exception e) {
+            Log.e("SSL_DEBUG", "SSL configuration failed: " + e.getMessage());
+            throw new RuntimeException("SSL context initialization failed: " + e.getMessage(), e);
+        }
     }
 }

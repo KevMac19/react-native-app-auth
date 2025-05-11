@@ -141,6 +141,7 @@ export const register = ({
   customHeaders,
   additionalHeaders,
   connectionTimeoutSeconds,
+  sslPins,
 }) => {
   validateIssuerOrServiceConfigurationRegistrationEndpoint(issuer, serviceConfiguration);
   validateHeaders(customHeaders);
@@ -185,6 +186,7 @@ export const register = ({
   if (Platform.OS === 'android') {
     nativeMethodArguments.push(dangerouslyAllowInsecureHttpRequests);
     nativeMethodArguments.push(customHeaders);
+    nativeMethodArguments.push(sslPins); 
   }
 
   if (Platform.OS === 'ios') {
@@ -214,6 +216,7 @@ export const authorize = ({
   androidTrustedWebActivity = false,
   connectionTimeoutSeconds,
   iosPrefersEphemeralSession = false,
+  sslPins,
 }) => {
   validateIssuerOrServiceConfigurationEndpoints(issuer, serviceConfiguration);
   validateClientId(clientId);
@@ -243,6 +246,7 @@ export const authorize = ({
     nativeMethodArguments.push(customHeaders);
     nativeMethodArguments.push(androidAllowCustomBrowsers);
     nativeMethodArguments.push(androidTrustedWebActivity);
+    nativeMethodArguments.push(sslPins);  
   }
 
   if (Platform.OS === 'ios') {
@@ -272,6 +276,7 @@ export const refresh = (
     iosCustomBrowser = null,
     androidAllowCustomBrowsers = null,
     connectionTimeoutSeconds,
+    sslPins,
   },
   { refreshToken }
 ) => {
@@ -301,6 +306,7 @@ export const refresh = (
     nativeMethodArguments.push(dangerouslyAllowInsecureHttpRequests);
     nativeMethodArguments.push(customHeaders);
     nativeMethodArguments.push(androidAllowCustomBrowsers);
+    nativeMethodArguments.push(sslPins); 
   }
 
   if (Platform.OS === 'ios') {
@@ -364,6 +370,7 @@ export const logout = (
     iosCustomBrowser = null,
     iosPrefersEphemeralSession = false,
     androidAllowCustomBrowsers = null,
+    sslPins
   },
   { idToken, postLogoutRedirectUrl }
 ) => {
@@ -382,6 +389,7 @@ export const logout = (
   if (Platform.OS === 'android') {
     nativeMethodArguments.push(dangerouslyAllowInsecureHttpRequests);
     nativeMethodArguments.push(androidAllowCustomBrowsers);
+    nativeMethodArguments.push(sslPins); 
   }
 
   if (Platform.OS === 'ios') {
