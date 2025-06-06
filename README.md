@@ -25,6 +25,20 @@ We only support the [Authorization Code Flow](https://oauth.net/2/grant-types/au
 
 > Check out the [full documentation here](https://commerce.nearform.com/open-source/react-native-app-auth/)!
 
+## SSL Pinning Configuration
+To enable SSL public key pinning, add an `sslPins` configuration:
+
+```javascript
+{
+  sslPins: {
+    'api.yourdomain.com': [
+      'Base64-encoded-SHA256-public-key-hash',
+      'Backup-public-key-hash'
+    ]
+  }
+}
+```
+
 ## Tested OpenID providers
 
 These providers are OpenID compliant, which means you can use [autodiscovery](https://openid.net/specs/openid-connect-discovery-1_0.html).
