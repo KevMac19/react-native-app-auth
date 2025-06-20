@@ -23,7 +23,7 @@ export default function Home(): JSX.Element {
               title: 'Examples',
             },
             {
-              link: 'https://github.com/FormidableLabs/react-native-app-auth',
+              link: 'https://github.com/KevMac19/react-native-app-auth',
               title: 'Github',
             },
           ]}

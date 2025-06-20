@@ -79,7 +79,7 @@ const config: Config = {
           label: 'Documentation',
         },
         {
-          href: 'https://github.com/FormidableLabs/react-native-app-auth',
+          href: 'https://github.com/KevMac19/react-native-app-auth',
           'aria-label': 'GitHub Repository',
           className: 'header-github-link',
           position: 'right',
